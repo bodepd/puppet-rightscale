@@ -1,0 +1,8 @@
+author: Dan Bode
+license: MIT license (or whatever)
+
+This is a basic wrapper for RightAPI to make my life a little easier.
+
+Its a little slow because I am getting all objects and querying on the client. I will need to implement it to perform better eventually.
+
+disclaimer - this software is known to be poorly implemented and full of bugs.
