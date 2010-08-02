@@ -25,7 +25,7 @@ module Puppet
       else
         bools=params.map do |k,v| 
 #puts "|#{item[k.to_s]}=?#{v}|"
-          item[k.to_s].downcase == v.downcase
+          item[k.to_s].nil? ? false: item[k.to_s].downcase == v.downcase
         end
         bools.inject{|a,b| a && b}
       end
