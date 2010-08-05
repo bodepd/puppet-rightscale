@@ -17,7 +17,7 @@ module Puppet
     end
 
     #
-    # check an item to see if it matches any params
+    # check an item to see if it matches all params
     #
     def check_params(item, params)
       if params.empty?
@@ -49,6 +49,7 @@ module Puppet
         if types.size == size
           types.first
         else
+          # this is kind of strange, I return nil if there is more than one match
 #puts 'not one'
 #puts types
           nil
@@ -58,6 +59,8 @@ module Puppet
       end
     end
     # get all settings ojects for all servers
+    # returns a hash{:settings, :server}
+    # NOTE: PDB this WILL NOT SCALE and is crazy slow, there must be a better way
     def get_server_settings(params={})
       # return data to be collected
       data = {}
@@ -85,30 +88,38 @@ module Puppet
   #   server - server
   #   right_script - name of script
   #   params - hash of input params that right_script needs
-    def run_script(deployment, server, right_script, inputs={})
-      deployment=get_obj('deployments', {:nickname => deployment})
+    def run_script(deployment_name, server_name, right_script, inputs={})
+      deployment=get_obj('deployments', {:nickname => deployment_name})
+      if deployment.nil?
+        raise Exception, "could not retrieve deployment: #{deployment_name}"
+      end
       dep_href=deployment['href']
       server=get_obj('servers', 
-        {:nickname => server, :deployment_href => dep_href}
+        {:nickname => server_name, :deployment_href => dep_href}
       )
+      if server.nil?
+        raise Exception, "could not retrieve server: #{server_name} deployment: #{deployment_name}"
+      end
       server_id=server['href'].match(/\d+$/)
       script=get_obj('right_scripts', {:name => right_script})
+      if script.nil?
+        raise Exception, "no rightscript with name: #{right_script} for server: #{server_name} deployment: #{deployment_name}"
+      end
       script_href=script['href']
       #puts "#{server_id}\n#{dep_href}\n#{script_href}"
       @api.send("servers/#{server_id}/run_script", 'post', 
         {:right_script => script_href}.merge(inputs)
       )
     end
-    def get_right_script(server_id)
-      rs_xml = @api.send("servers/#{server_id}/inputs")
-      #puts rs_xml.to_yaml
-    end
+
     # given some parameters, we will retrieve a server
     # (via its settings), then retrieve the tags for that server's template.
     def get_tags(params={})
       servers=get_server_settings(params)
-      if servers.size != 1
-        raise Exception, 'parameters did not return unique server'
+      if servers.size > 1
+        raise Exception, "parameters #{params} did not return unique server"
+      elsif servers.size == 0
+        raise Exception, "parameters #{params} did not return any servers"
       end
       #puts servers.to_yaml
       tags={}
@@ -124,7 +135,9 @@ module Puppet
     end
 
 
-    # get the data structure that is produced by an external node classifier.
+    # accepts a hash of options
+    # we will query server settings for all machines that match those options.
+    # if we find a single server, we will parse its tags to determine classes and params for a node
     def classify_puppet(opts)
       enc_yaml={:classes => [], :parameters => {}}
       tags=get_tags(opts)
