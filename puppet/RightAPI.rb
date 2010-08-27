@@ -50,7 +50,7 @@ module Puppet
           types.first
         else
           # this is kind of strange, I return nil if there is more than one match
-#puts 'not one'
+          puts 'not the right number of matches, got #{types.size}, expected #{size}'
 #puts types
           nil
         end
@@ -83,6 +83,16 @@ module Puppet
       end 
       data
     end
+      
+    # parse a rightscript from an executable list by name
+    def get_rs(template_id, name)
+      xml = @api.send("server_templates/#{template_id}/executables")
+      types = Crack::XML.parse(xml)['server_template_executables'].each do |exec|
+        rs=exec['right_script']
+        return rs if rs['name'] == name
+      end
+      raise Exception, "could not find rightscript #{name}"
+    end
   # runs a right script remotely
   #   deployment - deployment where servers exists.
   #   server - server
@@ -101,7 +111,8 @@ module Puppet
         raise Exception, "could not retrieve server: #{server_name} deployment: #{deployment_name}"
       end
       server_id=server['href'].match(/\d+$/)
-      script=get_obj('right_scripts', {:name => right_script})
+      server_template_id=server['server_template_href'].match(/\d+$/)
+      script=get_rs('70997', right_script)
       if script.nil?
         raise Exception, "no rightscript with name: #{right_script} for server: #{server_name} deployment: #{deployment_name}"
       end
